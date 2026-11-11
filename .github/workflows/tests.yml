@@ -1,0 +1,36 @@
+name: tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # app.py claims Python 3.9+ (see pyproject.toml), so prove it on the oldest and the newest.
+        python-version: ["3.9", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run the test suite
+        # No key, no network: the suite mocks Groq and boots the HTTP server on a local port.
+        run: python test_agent.py
+
+      - name: Check the app starts and serves the page
+        run: |
+          # Redirect the server's output so it does not hold the step open, and stop it again.
+          python app.py > server.log 2>&1 &
+          SERVER_PID=$!
+          sleep 2
+          curl -fsS http://127.0.0.1:8000/ | grep -q "Merchant chat"
+          curl -fsS http://127.0.0.1:8000/api/merchants | grep -q "M001"
+          kill $SERVER_PID

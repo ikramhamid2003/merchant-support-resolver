@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Merchant Support Resolver</title>
+<style>
+  :root { --navy:#0B1F3A; --cyan:#00B9F1; --bg:#F4F7FB; --card:#fff; --line:#D5DEEA; --muted:#5B6E86; --ok:#0A7A4B; --warn:#B45309; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", "Noto Sans Tamil", sans-serif; background:var(--bg); color:var(--navy); }
+  header { background:var(--navy); color:#fff; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  header h1 { font-size:20px; margin:0; } header span { color:var(--cyan); }
+  main { display:grid; grid-template-columns: 1.1fr 1fr; gap:16px; padding:16px 24px; max-width:1300px; margin:0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  h2 { font-size:14px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:0 0 10px; }
+  select, input, button { font:inherit; }
+  select, input { width:100%; padding:10px; border:1px solid var(--line); border-radius:8px; }
+  button { cursor:pointer; border:0; border-radius:8px; padding:10px 14px; background:var(--cyan); color:var(--navy); font-weight:600; }
+  button.ghost { background:#fff; border:1px solid var(--line); font-weight:400; padding:6px 10px; font-size:13px; }
+  button.dark { background:var(--navy); color:#fff; }
+  #chat { height:340px; overflow:auto; background:var(--bg); border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:8px; margin:10px 0; }
+  .bubble { max-width:85%; padding:8px 12px; border-radius:12px; line-height:1.45; white-space:pre-wrap; }
+  .me { align-self:flex-end; background:var(--navy); color:#fff; }
+  .bot { align-self:flex-start; background:#fff; border:1px solid var(--line); }
+  .row { display:flex; gap:8px; } .chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .step { border-left:4px solid var(--line); padding:6px 10px; margin:6px 0; background:var(--bg); border-radius:0 8px 8px 0; font-size:14px; }
+  .step small { display:block; color:var(--muted); word-break:break-word; margin-top:2px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size:12px; }
+  .k-understand { border-color:#7C3AED; } .k-policy { border-color:var(--warn); } .k-tool { border-color:var(--cyan); }
+  .k-decision { border-color:#64748B; } .k-report { border-color:var(--ok); }
+  .tag { font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.8px; margin-right:6px; }
+  .metrics { display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; }
+  .metric b { display:block; font-size:26px; } .metric span { color:var(--muted); font-size:12px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; } td, th { text-align:left; padding:6px; border-bottom:1px solid var(--line); }
+  .s-resolved { color:var(--ok); font-weight:600; } .s-escalated { color:var(--warn); font-weight:600; } .s-needs_info { color:var(--muted); font-weight:600; }
+  /* human handoff queue */
+  .count { background:var(--warn); color:#fff; border-radius:10px; padding:1px 8px; font-size:11px; vertical-align:2px; margin-left:6px; }
+  .esc { border:1px solid var(--line); border-left:4px solid var(--warn); border-radius:8px; padding:10px 12px; margin:8px 0; background:#fff; }
+  .esc-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:13px; }
+  .esc-case { font-family:ui-monospace,Menlo,Consolas,monospace; font-weight:700; color:var(--warn); }
+  .esc-when { color:var(--muted); font-size:12px; margin-left:auto; }
+  .esc-msg { margin:8px 0 6px; padding:7px 10px; background:var(--bg); border-radius:6px; font-size:14px; }
+  .esc-why { font-size:13px; color:var(--navy); margin:4px 0; }
+  .esc-file { margin-top:8px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; background:var(--bg); border-radius:6px; padding:8px 10px; }
+  .esc-file .row2 { display:flex; gap:8px; padding:1px 0; }
+  .esc-file .k { color:var(--muted); min-width:150px; flex:0 0 auto; }
+  .esc-file .v { color:var(--navy); word-break:break-word; }
+  .esc-file .d1 { padding-left:16px; } .esc-file .d2 { padding-left:32px; }
+  .esc-told { font-size:12px; color:var(--muted); margin-top:6px; }
+  .empty { color:var(--muted); font-size:13px; padding:6px 0; }
+  .eng { font-size:10px; text-transform:uppercase; letter-spacing:.7px; padding:1px 7px; border-radius:10px; font-weight:700; white-space:nowrap; }
+  .eng-rules { background:#E4EBF4; color:#4A5C74; }
+  .eng-groq { background:#D6F0FB; color:#00618C; }
+  .note { color:var(--muted); font-size:12px; margin-top:12px; }
+  .metric.b .eng { vertical-align:middle; margin-left:4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Merchant Support <span>Resolver</span> · Autonomous AI teammate</h1>
+  <div class="row" style="align-items:center">
+    <label id="grokbox" style="display:none;font-size:13px;gap:6px;align-items:center"><input type="checkbox" id="usegrok" checked style="width:auto"> Use Grok</label>
+    <span id="engine" style="font-size:12px;color:var(--cyan)"></span>
+    <button class="ghost" id="reset">Reset demo data</button>
+  </div>
+</header>
+<main>
+  <section class="card">
+    <h2>Merchant chat</h2>
+    <label for="merchant" style="font-size:13px;color:var(--muted)">Demo merchant (each one has a different scenario)</label>
+    <select id="merchant"></select>
+    <div id="chat" aria-live="polite"></div>
+    <div class="row">
+      <input id="msg" placeholder="Type in English, Hindi or Tamil..." autocomplete="off">
+      <button id="send">Send</button>
+    </div>
+    <div class="chips" id="chips"></div>
+  </section>
+
+  <section class="card">
+    <h2>Agent reasoning and actions (audit trail)</h2>
+    <div id="trace"><div class="step">Send a message to see how the agent understands, checks policy, acts and reports.</div></div>
+  </section>
+
+  <section class="card" style="grid-column:1/-1">
+    <h2>Human handoff queue <span class="count" id="esccount">0</span></h2>
+    <div id="escalations"><div class="empty">No escalations yet. Every case the agent could not fix inside policy lands here with the facts a human needs.</div></div>
+  </section>
+
+  <section class="card" style="grid-column:1/-1">
+    <h2>Outcomes</h2>
+    <div class="metrics" id="metrics"></div>
+    <div class="note" id="enginenote"></div>
+    <h2 style="margin-top:16px">Recent tickets</h2>
+    <table><thead><tr><th>#</th><th>Merchant</th><th>Message</th><th>Category</th><th>Engine</th><th>Status</th></tr></thead><tbody id="tickets"></tbody></table>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const PROMPTS = [
+  "My settlement has not arrived",
+  "Soundbox is not working",
+  "A chargeback was raised on my account",
+  "मेरा सेटलमेंट नहीं आया",
+  "QR काम नहीं कर रहा",
+  "என் செட்டில்மென்ட் வரவில்லை",
+  "panam varavillai"
+];
+let merchants = [];
+
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : undefined);
+  return r.json();
+}
+function bubble(text, cls) { const b = el("div", "bubble " + cls, text); $("chat").appendChild(b); $("chat").scrollTop = 1e9; }
+
+function renderTrace(trace) {
+  const box = $("trace"); box.textContent = "";
+  trace.forEach((s) => {
+    const d = el("div", "step k-" + s.kind);
+    const t = el("div"); t.appendChild(el("span", "tag", s.kind)); t.appendChild(document.createTextNode(s.title)); d.appendChild(t);
+    if (s.detail) d.appendChild(el("small", "", s.detail));
+    box.appendChild(d);
+  });
+}
+
+function renderEscalations(rows) {
+  const box = $("escalations"); box.textContent = "";
+  $("esccount").textContent = String(rows.length);
+  if (!rows.length) {
+    box.appendChild(el("div", "empty", "No escalations yet. Every case the agent could not fix inside policy lands here with the facts a human needs."));
+    return;
+  }
+  rows.forEach((r) => {
+    const card = el("div", "esc");
+
+    const head = el("div", "esc-head");
+    head.appendChild(el("span", "esc-case", r.case));
+    head.appendChild(el("span", "", r.merchant + " (" + r.merchant_id + ")"));
+    head.appendChild(el("span", "s-needs_info", "#" + r.ticket_id));
+    head.appendChild(el("span", "eng eng-" + (r.engine || "rules"), r.engine || "rules"));
+    head.appendChild(el("span", "esc-when", (r.created_at || "").replace("T", " ").slice(0, 16)));
+    card.appendChild(head);
+
+    card.appendChild(el("div", "esc-msg", r.message || ""));
+
+    const why = el("div", "esc-why");
+    why.appendChild(el("strong", "", "Why it was escalated: "));
+    why.appendChild(document.createTextNode(r.reason || ""));
+    card.appendChild(why);
+
+    const file = el("div", "esc-file");
+    const facts = flattenCaseFile(r.case_file);
+    if (!facts.length) {
+      file.appendChild(el("div", "row2", "No case file was attached."));
+    } else {
+      facts.forEach((f) => {
+        const row = el("div", "row2" + (f.depth === 1 ? " d1" : f.depth >= 2 ? " d2" : ""));
+        row.appendChild(el("span", "k", f.key));
+        row.appendChild(el("span", "v", f.value));
+        file.appendChild(row);
+      });
+    }
+    card.appendChild(file);
+
+    if (r.reply) {
+      const told = el("div", "esc-told");
+      told.appendChild(el("strong", "", "Told the merchant (" + (r.language || "en") + "): "));
+      told.appendChild(document.createTextNode(r.reply));
+      card.appendChild(told);
+    }
+    box.appendChild(card);
+  });
+}
+
+// Flatten the nested case file into readable key/value rows.
+function flattenCaseFile(obj, depth = 0, prefix = "") {
+  const out = [];
+  if (obj === null || obj === undefined) return out;
+  if (typeof obj !== "object") {
+    out.push({ key: prefix, value: formatCaseValue(obj), depth: depth });
+    return out;
+  }
+  const keys = Object.keys(obj);
+  if (!keys.length) return out;
+  keys.forEach((k) => {
+    const v = obj[k];
+    const label = prefix ? prefix + " › " + k : k;
+    if (v !== null && typeof v === "object") {
+      if (Array.isArray(v)) {
+        if (!v.length) out.push({ key: label, value: "none", depth: depth });
+        v.forEach((item, i) => {
+          if (item !== null && typeof item === "object") {
+            out.push({ key: label + " " + (i + 1), value: "", depth: depth + 1 });
+            out.push(...flattenCaseFile(item, depth + 1, ""));
+          } else {
+            out.push({ key: label + " " + (i + 1), value: formatCaseValue(item), depth: depth + 1 });
+          }
+        });
+      } else {
+        out.push({ key: label, value: "", depth: depth + 1 });
+        out.push(...flattenCaseFile(v, depth + 1, ""));
+      }
+    } else {
+      out.push({ key: label, value: formatCaseValue(v), depth: depth });
+    }
+  });
+  return out;
+}
+
+// Amounts read better grouped, and boolean flags read better as yes/no.
+function formatCaseValue(v) {
+  if (v === null || v === undefined) return "none";
+  if (typeof v === "boolean") return v ? "yes" : "no";
+  if (typeof v === "number") return v.toLocaleString("en-IN");
+  return String(v);
+}
+
+async function refresh() {
+  const m = await api("/api/metrics");
+  const M = $("metrics"); M.textContent = "";
+  const eng = m.by_engine || {}, avg = m.avg_ms_by_engine || {};
+  const tiles = [["Tickets handled", m.total], ["Auto-resolved", m.resolved + " (" + m.auto_resolution_rate + "%)"],
+                ["Escalated to human", m.escalated], ["Avg agent time", m.avg_ms + " ms"],
+                ["Handled by rules", eng.rules || 0], ["Handled by Groq", eng.groq || 0],
+                ["Avg time · rules", (avg.rules || 0) + " ms"], ["Avg time · Groq", (avg.groq || 0) + " ms"]];
+  tiles.forEach(([label, v]) => { const d = el("div", "metric"); d.appendChild(el("b", "", String(v))); d.appendChild(el("span", "", label)); M.appendChild(d); });
+
+  const parts = [];
+  if (m.groq_fallbacks) parts.push(m.groq_fallbacks + " Groq request" + (m.groq_fallbacks === 1 ? "" : "s") + " fell back to the rule-based agent.");
+  const used = Object.keys(m.models || {});
+  if (used.length) parts.push("Model: " + used.join(", ") + ".");
+  if (m.needs_info) parts.push(m.needs_info + " message" + (m.needs_info === 1 ? "" : "s") + " needed clarification and " + (m.needs_info === 1 ? "is" : "are") + " not counted in the auto-resolution rate.");
+  $("enginenote").textContent = parts.join(" ");
+
+  const rows = await api("/api/tickets"); const tb = $("tickets"); tb.textContent = "";
+  rows.forEach((r) => {
+    const tr = el("tr");
+    [r.id, r.name, r.message, r.category].forEach((v) => tr.appendChild(el("td", "", String(v))));
+    const te = el("td");
+    te.appendChild(el("span", "eng eng-" + (r.engine || "rules"), r.engine || "rules"));
+    tr.appendChild(te);
+    const td = el("td", "s-" + r.status, r.status); tr.appendChild(td); tb.appendChild(tr);
+  });
+  renderEscalations(await api("/api/escalations"));
+}
+
+async function send(text) {
+  text = (text || $("msg").value).trim(); if (!text) return;
+  $("msg").value = ""; bubble(text, "me");
+  const res = await api("/api/chat", { merchant_id: $("merchant").value, message: text, use_grok: $("usegrok").checked });
+  if (res.error) { bubble("Error: " + res.error, "bot"); return; }
+  bubble(res.reply, "bot"); renderTrace(res.trace); $("engine").textContent = "engine: " + res.engine; refresh();
+}
+
+(async function init() {
+  const cfg = await api("/api/config");
+  if (cfg.grok_available) { $("grokbox").style.display = "flex"; $("grokbox").title = cfg.grok_model; } else { $("usegrok").checked = false; }
+  merchants = await api("/api/merchants");
+  merchants.forEach((m) => { const o = el("option", "", m.id + " · " + m.name + " — " + m.scenario); o.value = m.id; $("merchant").appendChild(o); });
+  PROMPTS.forEach((p) => { const b = el("button", "ghost", p); b.onclick = () => send(p); $("chips").appendChild(b); });
+  $("send").onclick = () => send(); $("msg").addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+  $("merchant").onchange = () => { $("chat").textContent = ""; };
+  $("reset").onclick = async () => { await api("/api/reset", {}); $("chat").textContent = ""; refresh(); };
+  refresh();
+})();
+</script>
+</body>
+</html>
