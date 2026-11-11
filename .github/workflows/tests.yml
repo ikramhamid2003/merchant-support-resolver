@@ -8,16 +8,28 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         # app.py claims Python 3.9+ (see pyproject.toml), so prove it on the oldest and the newest.
-        python-version: ["3.9", "3.12", "3.13"]
+        #
+        # The runner image is pinned per Python version on purpose. `ubuntu-latest` has migrated to
+        # Ubuntu 26.04, and actions/python-versions only publishes 3.9 builds for Ubuntu 22.04 and
+        # 24.04 — Python 3.9 is past end of life, so there is no 26.04 build to install and the
+        # setup-python step fails with "The version '3.9' with architecture 'x64' was not found
+        # for Ubuntu 26.04". The 3.9 leg therefore runs on ubuntu-24.04, where the build exists.
+        include:
+          - python-version: "3.9"
+            os: ubuntu-24.04
+          - python-version: "3.12"
+            os: ubuntu-latest
+          - python-version: "3.13"
+            os: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
 
